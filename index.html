@@ -795,15 +795,20 @@ function scheduleCompare(delay){
   compareTimer=setTimeout(()=>compareNow(false),delay);
 }
 
-let activeDiffWorker=null;
+let activeDiffTask=null;
+function cancelActiveDiff(){
+  if(!activeDiffTask)return;
+  const task=activeDiffTask;
+  activeDiffTask=null;
+  task.worker.terminate();
+  task.reject(new DOMException("Comparación reemplazada","AbortError"));
+}
+
 function diffWordsAsync(txtA,txtB){
   const total=txtA.length+txtB.length;
   if(total<30000||typeof Worker==="undefined") return Promise.resolve(Diff.diffWords(txtA,txtB));
 
-  if(activeDiffWorker){
-    activeDiffWorker.terminate();
-    activeDiffWorker=null;
-  }
+  cancelActiveDiff();
 
   return new Promise((resolve,reject)=>{
     const source=`
@@ -819,11 +824,11 @@ function diffWordsAsync(txtA,txtB){
     `;
     const url=URL.createObjectURL(new Blob([source],{type:"text/javascript"}));
     const worker=new Worker(url);
-    activeDiffWorker=worker;
+    activeDiffTask={worker,reject};
     URL.revokeObjectURL(url);
 
     const finish=()=>{
-      if(activeDiffWorker===worker) activeDiffWorker=null;
+      if(activeDiffTask&&activeDiffTask.worker===worker) activeDiffTask=null;
       worker.terminate();
     };
     worker.onmessage=e=>{
@@ -1273,7 +1278,7 @@ async function buildPdfView(){
 
 document.getElementById("btnReset").addEventListener("click",()=>{
   clearTimeout(compareTimer);compareRun++;
-  if(activeDiffWorker){activeDiffWorker.terminate();activeDiffWorker=null}
+  cancelActiveDiff();
   ["A","B"].forEach(d=>{
     state[d].file=null;
     document.getElementById("file"+d).value="";
