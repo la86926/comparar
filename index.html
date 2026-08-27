@@ -636,7 +636,6 @@
       <span class="dot b"></span><span>Modificado</span><span class="grip" aria-hidden="true"></span>
     </div>
     <textarea id="floatingTextB" placeholder="Texto modificado…" spellcheck="true"></textarea>
-    <div class="floating-mini-actions"><button class="floating-mini-btn primary" id="floatingCompare">Comparar</button></div>
   </section>
 </div>
 
@@ -753,7 +752,6 @@ document.querySelectorAll(".floating-drag").forEach(handle=>{
 
 floatingTextA.addEventListener("input",()=>pushFloatingToMain("A",floatingTextA));
 floatingTextB.addEventListener("input",()=>pushFloatingToMain("B",floatingTextB));
-document.getElementById("floatingCompare").addEventListener("click",()=>compareNow(false));
 document.getElementById("floatingReset").addEventListener("click",()=>document.getElementById("btnReset").click());
 window.addEventListener("scroll",updateFloatingEditor,{passive:true});
 window.addEventListener("resize",()=>{updateFloatingEditor();keepFloatingPanesInViewport()});
