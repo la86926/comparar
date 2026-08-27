@@ -275,45 +275,7 @@
   }
   .navbtn:hover{transform:scale(1.04)}
   .navbtn:disabled{opacity:.2;cursor:default;transform:none}
-  .counter{min-width:72px;text-align:center;font-size:12.5px;font-weight:650}
-
-  /* Numbered change index */
-  .change-index{
-    flex-basis:100%;
-    display:none;
-    align-items:center;
-    gap:5px;
-    max-width:100%;
-    overflow-x:auto;
-    padding:4px 2px 1px;
-    scroll-behavior:smooth;
-    scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
-  }
-  .change-index::-webkit-scrollbar{display:none}
-  .change-index button{
-    flex:0 0 auto;
-    width:26px;height:26px;
-    display:grid;place-items:center;
-    border:0;border-radius:50%;
-    background:rgba(0,0,0,.055);
-    color:var(--muted);
-    font-size:11.5px;
-    font-weight:650;
-    cursor:pointer;
-    transition:background .16s ease,color .16s ease,transform .16s ease,box-shadow .16s ease;
-  }
-  .change-index button:hover{background:rgba(0,0,0,.09);color:var(--ink)}
-  .change-index button:active{transform:scale(.94)}
-  .change-index button.active{
-    background:#1d1d1f;
-    color:#fff;
-    box-shadow:0 2px 7px rgba(0,0,0,.16);
-  }
-  @media(max-width:650px){
-    .change-index{gap:4px;padding-top:3px}
-    .change-index button{width:24px;height:24px;font-size:10.5px}
-  }
+  .counter{min-width:105px;text-align:center;font-size:12.5px;font-weight:650}
 
   .viewtoggle{
     display:flex;
@@ -614,7 +576,6 @@
         <span><span class="chip add"></span>Agregado</span>
         <span><span class="chip del"></span>Eliminado</span>
       </div>
-      <div class="change-index" id="changeIndex" aria-label="Navegación por cambios"></div>
     </div>
   </nav>
 
@@ -820,7 +781,6 @@ function clearResultsWhenIncomplete(){
   document.getElementById("resultCard").style.display="none";
   document.getElementById("navbar").style.display="none";
   state.nChanges=0;state.current=-1;
-  renderChangeIndex();
   updateFloatingEditor();
   return true;
 }
@@ -995,7 +955,6 @@ async function compareNow(manual=false){
 
     card.style.display="block";
     state.nChanges=id;state.current=-1;
-    renderChangeIndex();
     requestAnimationFrame(updateFloatingEditor);
     pdfState.built=false;pdfState.ok=false;pdfState.groups=[];
     document.getElementById("paneLP").innerHTML="";
@@ -1020,7 +979,6 @@ document.getElementById("btnCompare").addEventListener("click",()=>compareNow(tr
 function setView(v){
   if(v==="pdf"&&!bothArePdf()) v="sync";
   state.view=v;
-  renderChangeIndex();
   const split=v==="split"||v==="sync";
   document.getElementById("unifiedView").style.display=v==="unified"?"block":"none";
   document.getElementById("splitView").style.display=split?"grid":"none";
@@ -1055,39 +1013,6 @@ linkScroll("paneL","paneR",["sync"]);
 linkScroll("paneR","paneL",["sync"]);
 linkScroll("paneLP","paneRP",["pdf"]);
 linkScroll("paneRP","paneLP",["pdf"]);
-
-function renderChangeIndex(){
-  const box=document.getElementById("changeIndex");
-  if(!box)return;
-  const n=state.view==="pdf"?pdfState.groups.length:state.nChanges;
-  box.innerHTML="";
-  if(!n){box.style.display="none";return}
-  box.style.display="flex";
-  const frag=document.createDocumentFragment();
-  for(let i=0;i<n;i++){
-    const b=document.createElement("button");
-    b.type="button";
-    b.textContent=String(i+1);
-    b.dataset.index=String(i);
-    b.setAttribute("aria-label","Ir al cambio "+(i+1));
-    b.addEventListener("click",()=>goTo(i));
-    frag.appendChild(b);
-  }
-  box.appendChild(frag);
-  updateChangeIndexActive();
-}
-
-function updateChangeIndexActive(){
-  const box=document.getElementById("changeIndex");
-  if(!box)return;
-  const buttons=[...box.querySelectorAll("button")];
-  buttons.forEach((b,i)=>b.classList.toggle("active",i===state.current));
-  const active=buttons[state.current];
-  if(active&&box.clientWidth){
-    const target=active.offsetLeft-box.clientWidth/2+active.offsetWidth/2;
-    box.scrollTo({left:Math.max(0,target),behavior:"smooth"});
-  }
-}
 
 function goTo(idx,keep){
   const isPdf=state.view==="pdf";
@@ -1130,10 +1055,9 @@ function centerInPane(paneId,elId){
 
 function updateCounter(){
   const n=state.view==="pdf"?pdfState.groups.length:state.nChanges;
-  document.getElementById("counter").textContent=n?(state.current+1)+" / "+n:"—";
+  document.getElementById("counter").textContent=n?"Cambio "+(state.current+1)+" de "+n:"—";
   document.getElementById("btnPrev").disabled=state.current<=0;
   document.getElementById("btnNext").disabled=state.current>=n-1;
-  updateChangeIndexActive();
 }
 
 document.getElementById("btnPrev").addEventListener("click",()=>goTo(state.current-1));
@@ -1257,7 +1181,7 @@ async function buildPdfView(){
     L.innerHTML='<div class="empty">No se pudo generar la vista PDF: '+escP(err.message)+'</div>';R.innerHTML="";
     pdfState.ok=false;pdfState.groups=[];
   }
-  pdfState.built=true;pdfState.building=false;renderChangeIndex();updateCounter();
+  pdfState.built=true;pdfState.building=false;updateCounter();
 }
 
 document.getElementById("btnReset").addEventListener("click",()=>{
@@ -1270,7 +1194,6 @@ document.getElementById("btnReset").addEventListener("click",()=>{
   });
   state.nChanges=0;state.current=-1;state.view="sync";
   pdfState.built=false;pdfState.ok=false;pdfState.groups=[];
-  renderChangeIndex();
   document.getElementById("paneLP").innerHTML="";document.getElementById("paneRP").innerHTML="";
   document.getElementById("resultCard").style.display="none";
   document.getElementById("navbar").style.display="none";
