@@ -1,0 +1,247 @@
+from pathlib import Path
+
+path = Path("index.html")
+s = path.read_text(encoding="utf-8")
+marker = "/* Floating compact editor */"
+
+if marker in s:
+    print("Floating editor already present; no patch needed.")
+    raise SystemExit(0)
+
+css = r'''
+
+  /* Floating compact editor */
+  .floating-editor{
+    position:fixed;
+    left:50%;
+    bottom:18px;
+    z-index:80;
+    width:min(1040px,calc(100vw - 36px));
+    transform:translate(-50%,calc(100% + 44px));
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .22s ease,visibility .22s ease;
+  }
+  .floating-editor.visible{
+    transform:translate(-50%,0);
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+  }
+  .floating-editor-inner{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
+    gap:10px;
+    align-items:end;
+    padding:11px;
+    border:1px solid rgba(0,0,0,.1);
+    border-radius:20px;
+    background:rgba(255,255,255,.88);
+    backdrop-filter:blur(30px) saturate(1.35);
+    -webkit-backdrop-filter:blur(30px) saturate(1.35);
+    box-shadow:0 16px 50px rgba(0,0,0,.14),0 2px 8px rgba(0,0,0,.06);
+  }
+  .floating-field{min-width:0}
+  .floating-label{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    margin:0 8px 6px;
+    color:var(--muted);
+    font-size:11.5px;
+    font-weight:650;
+  }
+  .floating-editor textarea{
+    min-height:76px;
+    height:76px;
+    max-height:150px;
+    resize:vertical;
+    padding:10px 12px;
+    border-radius:13px;
+    background:rgba(248,248,250,.94);
+    font-size:12.5px;
+    line-height:1.4;
+  }
+  .floating-actions{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+    padding-bottom:1px;
+  }
+  .floating-actions .btn{
+    min-width:92px;
+    padding:9px 13px;
+    white-space:nowrap;
+  }
+  body.floating-editor-on{padding-bottom:190px}
+
+  @media(max-width:720px){
+    .floating-editor{
+      bottom:10px;
+      width:calc(100vw - 20px);
+    }
+    .floating-editor-inner{
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      padding:9px;
+      border-radius:18px;
+    }
+    .floating-editor textarea{
+      min-height:64px;
+      height:64px;
+      padding:9px 10px;
+      font-size:12px;
+      border-radius:12px;
+    }
+    .floating-label{margin:0 5px 5px;font-size:10.5px}
+    .floating-actions{
+      grid-column:1/-1;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:7px;
+      padding:0;
+    }
+    .floating-actions .btn{min-width:0;padding:8px 12px}
+    body.floating-editor-on{padding-bottom:175px}
+  }
+'''
+
+css_anchor = "  @media(prefers-reduced-motion:reduce){"
+if css_anchor not in s:
+    raise RuntimeError("CSS insertion anchor not found")
+s = s.replace(css_anchor, css + "\n" + css_anchor, 1)
+
+html = r'''
+
+<div class="floating-editor" id="floatingEditor" aria-label="Edición rápida para una nueva comparación">
+  <div class="floating-editor-inner">
+    <div class="floating-field">
+      <label class="floating-label" for="floatingTextA"><span class="dot a"></span>Original</label>
+      <textarea id="floatingTextA" placeholder="Pega el texto original…" spellcheck="true"></textarea>
+    </div>
+    <div class="floating-field">
+      <label class="floating-label" for="floatingTextB"><span class="dot b"></span>Modificado</label>
+      <textarea id="floatingTextB" placeholder="Pega el texto modificado…" spellcheck="true"></textarea>
+    </div>
+    <div class="floating-actions">
+      <button class="btn btn-primary" id="floatingCompare">Comparar</button>
+      <button class="btn btn-secondary" id="floatingReset">Limpiar</button>
+    </div>
+  </div>
+</div>
+'''
+
+html_anchor = "</main>\n\n<script>"
+if html_anchor not in s:
+    raise RuntimeError("HTML insertion anchor not found")
+s = s.replace(html_anchor, "</main>" + html + "\n<script>", 1)
+
+js = r'''
+
+/* Editor flotante compacto: mantiene sincronizadas las cajas grandes y pequeñas */
+const floatingEditor=document.getElementById("floatingEditor");
+const floatingTextA=document.getElementById("floatingTextA");
+const floatingTextB=document.getElementById("floatingTextB");
+
+function syncFloatingFromMain(doc){
+  const main=document.getElementById("text"+doc);
+  const mini=doc==="A"?floatingTextA:floatingTextB;
+  if(mini&&main&&mini.value!==main.value) mini.value=main.value;
+}
+
+function updateFloatingEditor(){
+  if(!floatingEditor) return;
+  const card=document.getElementById("resultCard");
+  const grid=document.querySelector(".grid");
+  const bothText=state.A.mode==="text"&&state.B.mode==="text";
+  const hasResult=card&&getComputedStyle(card).display!=="none";
+  const inputsPassed=grid&&grid.getBoundingClientRect().bottom<110;
+  const show=!!(bothText&&hasResult&&inputsPassed);
+  floatingEditor.classList.toggle("visible",show);
+  document.body.classList.toggle("floating-editor-on",show);
+  if(show){syncFloatingFromMain("A");syncFloatingFromMain("B")}
+}
+
+function pushFloatingToMain(doc,mini){
+  const main=document.getElementById("text"+doc);
+  if(!main||main.value===mini.value) return;
+  main.value=mini.value;
+  main.dispatchEvent(new Event("input",{bubbles:true}));
+}
+
+floatingTextA.addEventListener("input",()=>pushFloatingToMain("A",floatingTextA));
+floatingTextB.addEventListener("input",()=>pushFloatingToMain("B",floatingTextB));
+document.getElementById("floatingCompare").addEventListener("click",()=>compareNow(false));
+document.getElementById("floatingReset").addEventListener("click",()=>document.getElementById("btnReset").click());
+window.addEventListener("scroll",updateFloatingEditor,{passive:true});
+window.addEventListener("resize",updateFloatingEditor);
+'''
+
+js_anchor = "function contentLabel(doc){"
+if js_anchor not in s:
+    raise RuntimeError("JS insertion anchor not found")
+s = s.replace(js_anchor, js + "\n" + js_anchor, 1)
+
+old = '''  document.getElementById("btnPdf").disabled=!bothArePdf();
+}'''
+new = '''  document.getElementById("btnPdf").disabled=!bothArePdf();
+  updateFloatingEditor();
+}'''
+if old not in s:
+    raise RuntimeError("updateModeLabels anchor not found")
+s = s.replace(old, new, 1)
+
+old = '''  state.nChanges=0;state.current=-1;
+  return true;'''
+new = '''  state.nChanges=0;state.current=-1;
+  updateFloatingEditor();
+  return true;'''
+if old not in s:
+    raise RuntimeError("clearResultsWhenIncomplete anchor not found")
+s = s.replace(old, new, 1)
+
+old = '''  document.getElementById("text"+doc).addEventListener("input",()=>{
+    if(state[doc].mode!=="text") return;
+    if(!clearResultsWhenIncomplete()) scheduleCompare();
+  });'''
+new = '''  document.getElementById("text"+doc).addEventListener("input",()=>{
+    if(state[doc].mode!=="text") return;
+    syncFloatingFromMain(doc);
+    if(!clearResultsWhenIncomplete()) scheduleCompare();
+  });'''
+if old not in s:
+    raise RuntimeError("textarea input handler anchor not found")
+s = s.replace(old, new, 1)
+
+old = '''    card.style.display="block";
+    state.nChanges=id;state.current=-1;'''
+new = '''    card.style.display="block";
+    state.nChanges=id;state.current=-1;
+    requestAnimationFrame(updateFloatingEditor);'''
+if old not in s:
+    raise RuntimeError("compare result anchor not found")
+s = s.replace(old, new, 1)
+
+old = '''  document.getElementById("liveText").textContent="Comparación automática activada";
+  setView("sync");'''
+new = '''  document.getElementById("liveText").textContent="Comparación automática activada";
+  floatingTextA.value="";floatingTextB.value="";
+  updateFloatingEditor();
+  setView("sync");'''
+if old not in s:
+    raise RuntimeError("reset anchor not found")
+s = s.replace(old, new, 1)
+
+old = '''updateModeLabels();
+document.getElementById("textA").focus();'''
+new = '''syncFloatingFromMain("A");syncFloatingFromMain("B");
+updateModeLabels();
+updateFloatingEditor();
+document.getElementById("textA").focus();'''
+if old not in s:
+    raise RuntimeError("initialization anchor not found")
+s = s.replace(old, new, 1)
+
+path.write_text(s, encoding="utf-8")
+print("index.html patched successfully")
